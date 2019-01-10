@@ -21,6 +21,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Catch
 import Data.Aeson
+import Data.ByteString (ByteString)
 import Data.Maybe
 import Data.Text (Text, pack)
 import Data.Text.Encoding
@@ -87,14 +88,38 @@ data PostCalls = PostCalls
   } deriving (Show, Eq)
 
 instance Post1 PostCalls Call where
-  post1 postCalls = request parseJSONFromResponse =<<
-    makeTwilioPOSTRequest "/Calls.json"
-      [ ("To", encodeUtf8 $ Twilio.Calls.to postCalls)
-      , ("From", encodeUtf8 $ Twilio.Calls.from postCalls)
-      , ("Url", encodeUtf8 . pack $ show url)
+  post1 postCalls
+    = (request parseJSONFromResponse =<<)
+    . makeTwilioPOSTRequest "/Calls.json"
+    . catMaybes . map sequence $
+      [ ("To", Just . encodeUtf8 $ Twilio.Calls.to postCalls)
+      , ("From", Just . encodeUtf8 $ Twilio.Calls.from postCalls)
+      , ("Url", encodeUrl <$> url)
+      , ("Method", encodeUtf8 <$> method postCalls)
+      , ("ApplicationSid", encodeUtf8 . pack . show <$> applicationSid)
+      , ("FallbackUrl", encodeUrl <$> fallbackURL postCalls)
+      , ("FallbackMethod", encodeUtf8 <$> fallbackMethod postCalls)
+      , ("StatusCallback", encodeUrl <$> statusCallback postCalls)
+      , ("StatusCallbackMethod", encodeUtf8 <$> statusCallbackMethod postCalls)
+      , ("SendDigits", encodeUtf8 <$> sendDigits postCalls)
+      , ("IfMachine", encodeUtf8 . pack . show <$> ifMachine postCalls)
+      , ("Timeout", encodeUtf8 . pack . show <$> timeout postCalls)
+      , ("Record", encodeBool <$> record postCalls)
       ]
     where
-      url = let Left url = urlOrApplicationSID postCalls in url
+      encodeUrl :: URI -> ByteString
+      encodeUrl = encodeUtf8 . pack . show
+
+      encodeBool :: Bool -> ByteString
+      encodeBool True = "true"
+      encodeBool False = "false"
+
+      url :: Maybe URI
+      applicationSid :: Maybe ApplicationSID
+      (url, applicationSid) =
+        case urlOrApplicationSID postCalls of
+          Left url -> (Just url, Nothing)
+          Right applicationSid -> (Nothing, Just applicationSid)
 
 instance Post3 Text Text URI Call where
   post3 to from url = request parseJSONFromResponse =<<
