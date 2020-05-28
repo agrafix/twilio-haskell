@@ -80,7 +80,7 @@ instance FromJSON APIVersion where
 
 makeTwilioRequest' :: Monad m => Text -> TwilioT m Request
 makeTwilioRequest' suffix = do
-  ((accountSID, authToken), _) <- ask
+  Settings { credentials = (accountSID, authToken), baseURL = baseURL } <- ask
 #if MIN_VERSION_http_client(0,4,30)
   let Just request = parseUrlThrow . T.unpack $ baseURL <> suffix
 #else
@@ -91,7 +91,7 @@ makeTwilioRequest' suffix = do
 
 makeTwilioRequest :: Monad m => Text -> TwilioT m Request
 makeTwilioRequest suffix = do
-  ((_, _), accountSID) <- ask
+  (accountSID, _) <- asks credentials
   makeTwilioRequest' $ "/Accounts/" <> getSID accountSID <> suffix
 
 makeTwilioPOSTRequest' :: Monad m

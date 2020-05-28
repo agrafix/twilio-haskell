@@ -56,12 +56,9 @@ runRequest (RequestT (FreeT m)) = m >>= \case
     run (RequestF (_, go)) = undefined
 -}
 
-baseURL :: Text
-baseURL = "https://api.twilio.com/2010-04-01"
-
-runRequest' :: MonadIO m => (Text, Text) -> RequestT m a -> m a
-runRequest' credentials (RequestT (FreeT m)) = m >>= \case
-    Free f -> runRequest' credentials . RequestT =<< run (return <$> f)
+runRequest' :: MonadIO m => RequestT m a -> m a
+runRequest' (RequestT (FreeT m)) = m >>= \case
+    Free f -> runRequest' . RequestT =<< run (return <$> f)
     Pure a -> return a
   where
     run (RequestF (request, go)) = do

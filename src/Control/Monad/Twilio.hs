@@ -1,6 +1,7 @@
 {-#LANGUAGE DeriveDataTypeable #-}
 {-#LANGUAGE FlexibleInstances #-}
 {-#LANGUAGE MultiParamTypeClasses #-}
+{-#LANGUAGE OverloadedStrings #-}
 {-#LANGUAGE RankNTypes #-}
 -------------------------------------------------------------------------------
 -- |
@@ -15,12 +16,15 @@ module Control.Monad.Twilio
     Twilio
   , runTwilio
   , runTwilio'
+  , runTwilioWith
     -- * The Twilio monad transformer
   , TwilioT(..)
   , runTwilioT
   , runTwilioT'
     -- * Types
   , Credentials
+  , Settings(..)
+  , defaultSettings
   , TwilioException(..)
   ) where
 
@@ -77,11 +81,23 @@ runTwilio' = runTwilioT'
 
 {- The Twilio monad transformer -}
 
+data Settings = Settings
+  { baseURL :: Text
+  , credentials :: Credentials
+  }
+
+defaultSettings :: Credentials -> Settings
+defaultSettings credentials =
+  Settings
+    { baseURL = "https://api.twilio.com/2010-04-01"
+    , credentials = credentials
+    }
+
 -- | This monad transformer allows you to make authenticated REST API requests
 -- to Twilio using your 'AccountSID' and 'AuthToken'.
-newtype TwilioT m a = TwilioT (Monad m => (Credentials, AccountSID) -> RequestT m a)
+newtype TwilioT m a = TwilioT (Monad m => Settings -> RequestT m a)
 
-getTwilioT :: Monad m => TwilioT m a -> (Credentials, AccountSID) -> RequestT m a
+getTwilioT :: Monad m => TwilioT m a -> Settings -> RequestT m a
 getTwilioT (TwilioT f) = f
 
 instance Monad m => MonadRequest (TwilioT m) where
@@ -92,10 +108,14 @@ instance Monad m => MonadRequest (TwilioT m) where
 -- | Run zero or more REST API requests to Twilio, unwrapping the inner monad
 -- @m@.
 runTwilioT :: MonadIO m => Credentials -> TwilioT m a -> m a
-runTwilioT credentials@(accountSID, authToken) (TwilioT go) = do
-  let basicAuthCredentials = (getSID accountSID, getAuthToken authToken)
-  let requestM = go (credentials, accountSID)
-  runRequest' basicAuthCredentials requestM
+runTwilioT credentials (TwilioT go) = do
+  let requestM = go (defaultSettings credentials)
+  runRequest' requestM
+
+-- | Run zero or more REST API requests to Twilio, unwrapping the inner monad
+-- @m@.
+runTwilioWith :: Settings -> Twilio a -> IO a
+runTwilioWith settings (TwilioT go) = runRequest' (go settings)
 
 -- | Parse an 'AccountSID' and 'AuthToken' before running zero or more REST API
 -- requests to Twilio, unwrapping the inner monad @m@.
@@ -135,7 +155,7 @@ instance Monad m => Monad (TwilioT m) where
     a <- getTwilioT m client
     getTwilioT (k a) client
 
-instance Monad m => MonadReader (Credentials, AccountSID) (TwilioT m) where
+instance Monad m => MonadReader Settings (TwilioT m) where
   ask = TwilioT return
   local f m = TwilioT $ getTwilioT m . f
 
