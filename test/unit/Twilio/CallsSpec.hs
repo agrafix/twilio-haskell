@@ -65,6 +65,6 @@ unwrapFirstRequest :: TwilioT (Either SomeException) a -> HTTP.Request
 unwrapFirstRequest (TwilioT f) =
   let accsid = mkAccountSID 0 0
       Just token = parseAuthToken ""
-  in case f ((accsid, token), accsid) of
+  in case f (defaultSettings (accsid, token)) of
     Request.RequestT (Free.FreeT (Right (Free.Free (Request.RequestF (x, _))))) -> x
     _ -> error "unexpected result"

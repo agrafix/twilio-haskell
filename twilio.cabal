@@ -127,6 +127,7 @@ test-suite integrationtests
   main-is:             Spec.hs
   Type:                exitcode-stdio-1.0
   other-modules:       Twilio.Types.PriceUnitSpec
+                       Twilio.CallsSpec
   build-depends:       base
                      , hspec == 2.*
                      , QuickCheck == 2.*
@@ -134,3 +135,8 @@ test-suite integrationtests
                      , aeson
                      , twilio
                      , quickcheck-instances
+                     , http-client
+                     , http-types
+                     , bytestring
+                     , network-uri
+                     , free
